@@ -311,13 +311,14 @@ def main():
                 
                 # Add a column for draft status
                 display_data_with_draft = display_data.copy()
-                display_data_with_draft['Draft Status'] = display_data_with_draft['Player'].apply(
-                    lambda x: "✅ Drafted" if x in st.session_state.drafted_players else "⭕ Available"
-                )
+                if not display_data_with_draft.empty and 'Player' in display_data_with_draft.columns:
+                    display_data_with_draft['Draft Status'] = display_data_with_draft['Player'].apply(
+                        lambda x: "✅ Drafted" if x in st.session_state.drafted_players else "⭕ Available"
+                    )
                 
                 # Filter out drafted players from the table if desired
                 show_drafted = st.checkbox("Show drafted players in table", value=False)
-                if not show_drafted:
+                if not show_drafted and not display_data_with_draft.empty and 'Player' in display_data_with_draft.columns:
                     display_data_with_draft = display_data_with_draft[
                         ~display_data_with_draft['Player'].isin(st.session_state.drafted_players)
                     ]
@@ -330,15 +331,16 @@ def main():
                 
                 # Quick draft buttons for top players
                 st.subheader("⚡ Quick Draft (Top 10 Available)")
-                top_available = display_data_with_draft.head(10)
-                
-                cols = st.columns(5)
-                for i, (_, player) in enumerate(top_available.iterrows()):
-                    if i < 10 and player['Player'] not in st.session_state.drafted_players:
-                        with cols[i % 5]:
-                            if st.button(f"Draft {player['Player']}", key=f"quick_draft_{player['Player']}"):
-                                st.session_state.drafted_players.add(player['Player'])
-                                st.rerun()
+                if not display_data_with_draft.empty and 'Player' in display_data_with_draft.columns:
+                    top_available = display_data_with_draft.head(10)
+                    
+                    cols = st.columns(5)
+                    for i, (_, player) in enumerate(top_available.iterrows()):
+                        if i < 10 and player['Player'] not in st.session_state.drafted_players:
+                            with cols[i % 5]:
+                                if st.button(f"Draft {player['Player']}", key=f"quick_draft_{player['Player']}"):
+                                    st.session_state.drafted_players.add(player['Player'])
+                                    st.rerun()
         
         else:
             st.warning("No players match your current filters.")
