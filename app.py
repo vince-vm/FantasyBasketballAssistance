@@ -22,72 +22,245 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for modern styling
+# Modern StatsMuse-Inspired CSS Design System
 st.markdown("""
 <style>
+    /* Import Google Fonts for modern typography */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    /* Root Variables for Design System */
+    :root {
+        --primary-color: #2563eb;
+        --primary-dark: #1d4ed8;
+        --primary-light: #3b82f6;
+        --secondary-color: #64748b;
+        --accent-color: #f59e0b;
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --error-color: #ef4444;
+        --background-primary: #ffffff;
+        --background-secondary: #f8fafc;
+        --background-tertiary: #f1f5f9;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #94a3b8;
+        --border-color: #e2e8f0;
+        --border-radius: 12px;
+        --border-radius-lg: 16px;
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    }
+    
+    /* Global Typography */
     .main-header {
-        font-size: 3rem;
-        font-weight: bold;
+        font-family: 'Inter', sans-serif;
+        font-size: 3.5rem;
+        font-weight: 800;
         text-align: center;
-        margin-bottom: 2rem;
-        background: linear-gradient(90deg, #1f4e79, #2e7d32);
+        margin-bottom: 3rem;
+        background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+    }
+    
+    /* Modern Card System */
+    .stats-card {
+        background: var(--background-primary);
+        border-radius: var(--border-radius-lg);
+        padding: 2rem;
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border-color);
+        transition: all 0.3s ease;
+        margin-bottom: 1.5rem;
+    }
+    
+    .stats-card:hover {
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-2px);
     }
     
     .metric-card {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #2e7d32;
-        margin: 0.5rem 0;
+        background: linear-gradient(135deg, var(--background-primary), var(--background-secondary));
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+        margin: 0.75rem 0;
+        transition: all 0.2s ease;
     }
     
-    .draft-tracker {
-        background-color: #fff3cd;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #ffc107;
-        margin: 1rem 0;
+    .metric-card:hover {
+        box-shadow: var(--shadow-md);
+        border-color: var(--primary-color);
     }
     
-    .stDataFrame {
-        border-radius: 0.5rem;
+    /* Player Card Design */
+    .player-card {
+        background: var(--background-primary);
+        border-radius: var(--border-radius);
+        padding: 1.25rem;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+        margin: 0.75rem 0;
+        transition: all 0.3s ease;
+        position: relative;
         overflow: hidden;
     }
     
+    .player-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(180deg, var(--primary-color), var(--accent-color));
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .player-card:hover {
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-2px);
+        border-color: var(--primary-color);
+    }
+    
+    .player-card:hover::before {
+        opacity: 1;
+    }
+    
+    .player-name {
+        font-family: 'Inter', sans-serif;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+    
+    .player-stats {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-top: 0.75rem;
+    }
+    
+    .stat-item {
+        background: var(--background-tertiary);
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+    
+    .stat-value {
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+    
+    /* Draft Tracker */
+    .draft-tracker {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border-radius: var(--border-radius-lg);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-md);
+        border: 1px solid #f59e0b;
+        margin: 1.5rem 0;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .draft-tracker::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(90deg, var(--accent-color), #fbbf24);
+    }
+    
+    /* Modern Buttons */
     .stButton > button {
-        background-color: #2e7d32;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
         color: white;
-        border-radius: 0.5rem;
+        border-radius: var(--border-radius);
         border: none;
-        padding: 0.5rem 1rem;
-        font-weight: bold;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.875rem;
+        box-shadow: var(--shadow-sm);
+        transition: all 0.2s ease;
+        text-transform: none;
     }
     
     .stButton > button:hover {
-        background-color: #1b5e20;
-        color: white;
+        background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
     }
     
-    /* Fancy Loading Spinner */
+    .draft-button {
+        background: linear-gradient(135deg, var(--success-color), #059669) !important;
+        font-size: 0.75rem !important;
+        padding: 0.5rem 1rem !important;
+    }
+    
+    .draft-button:hover {
+        background: linear-gradient(135deg, #059669, var(--success-color)) !important;
+    }
+    
+    /* Data Table Styling */
+    .stDataFrame {
+        border-radius: var(--border-radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border-color);
+    }
+    
+    /* Sidebar Styling */
+    .css-1d391kg {
+        background: var(--background-secondary);
+        border-right: 1px solid var(--border-color);
+    }
+    
+    /* Section Headers */
+    .section-header {
+        font-family: 'Inter', sans-serif;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 2rem 0 1rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+    }
+    
+    /* Loading Spinner */
     .loading-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 200px;
+        height: 300px;
         flex-direction: column;
+        background: var(--background-secondary);
+        border-radius: var(--border-radius-lg);
+        margin: 2rem 0;
     }
     
     .spinner {
-        width: 60px;
-        height: 60px;
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #2e7d32;
+        width: 80px;
+        height: 80px;
+        border: 4px solid var(--border-color);
+        border-top: 4px solid var(--primary-color);
         border-radius: 50%;
         animation: spin 1s linear infinite;
-        margin-bottom: 20px;
+        margin-bottom: 1.5rem;
     }
     
     @keyframes spin {
@@ -96,31 +269,94 @@ st.markdown("""
     }
     
     .loading-text {
-        font-size: 18px;
-        color: #2e7d32;
-        font-weight: bold;
+        font-family: 'Inter', sans-serif;
+        font-size: 1.125rem;
+        color: var(--text-secondary);
+        font-weight: 500;
         text-align: center;
     }
     
+    /* Maintenance Message */
     .maintenance-message {
-        background-color: #fff3cd;
-        border: 1px solid #ffeaa7;
-        border-radius: 0.5rem;
-        padding: 2rem;
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border: 1px solid var(--accent-color);
+        border-radius: var(--border-radius-lg);
+        padding: 3rem;
         text-align: center;
-        margin: 2rem 0;
+        margin: 3rem 0;
+        box-shadow: var(--shadow-lg);
     }
     
     .maintenance-title {
-        font-size: 24px;
-        color: #856404;
-        font-weight: bold;
+        font-family: 'Inter', sans-serif;
+        font-size: 2rem;
+        color: #92400e;
+        font-weight: 700;
         margin-bottom: 1rem;
     }
     
     .maintenance-text {
-        font-size: 16px;
-        color: #856404;
+        font-family: 'Inter', sans-serif;
+        font-size: 1.125rem;
+        color: #92400e;
+        font-weight: 400;
+    }
+    
+    /* Quick Draft Section */
+    .quick-draft-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+    
+    .quick-draft-item {
+        background: var(--background-primary);
+        border-radius: var(--border-radius);
+        padding: 1rem;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+        text-align: center;
+        transition: all 0.2s ease;
+    }
+    
+    .quick-draft-item:hover {
+        box-shadow: var(--shadow-md);
+        border-color: var(--primary-color);
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .main-header {
+            font-size: 2.5rem;
+        }
+        
+        .player-stats {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .quick-draft-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: var(--background-tertiary);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-muted);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -343,33 +579,88 @@ def main():
             name_search
         )
         
-        # Summary metrics
-        st.subheader("📈 Summary Statistics")
+        # Modern Summary Cards
+        st.markdown('<h2 class="section-header">📊 Dashboard Overview</h2>', unsafe_allow_html=True)
+        
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("Total Players", len(st.session_state.filtered_data))
+            st.markdown(f'''
+            <div class="metric-card">
+                <div style="font-size: 2rem; font-weight: 700; color: var(--primary-color); margin-bottom: 0.5rem;">
+                    {len(st.session_state.filtered_data)}
+                </div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">
+                    Available Players
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
         
         with col2:
             if not st.session_state.filtered_data.empty:
                 avg_fppg = st.session_state.filtered_data['FPPG'].mean()
-                st.metric("Avg FPPG", f"{avg_fppg:.1f}")
+                st.markdown(f'''
+                <div class="metric-card">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--success-color); margin-bottom: 0.5rem;">
+                        {avg_fppg:.1f}
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">
+                        Average FPPG
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
             else:
-                st.metric("Avg FPPG", "N/A")
+                st.markdown('''
+                <div class="metric-card">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem;">
+                        N/A
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">
+                        Average FPPG
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
         
         with col3:
             if not st.session_state.filtered_data.empty:
                 top_player = st.session_state.filtered_data.iloc[0]['Player']
                 top_fppg = st.session_state.filtered_data.iloc[0]['FPPG']
-                st.metric("Top Player", f"{top_player} ({top_fppg:.1f})")
+                st.markdown(f'''
+                <div class="metric-card">
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--accent-color); margin-bottom: 0.5rem;">
+                        {top_player}
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">
+                        Top Player ({top_fppg:.1f} FPPG)
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
             else:
-                st.metric("Top Player", "N/A")
+                st.markdown('''
+                <div class="metric-card">
+                    <div style="font-size: 2rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem;">
+                        N/A
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">
+                        Top Player
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
         
         with col4:
-            st.metric("Drafted", len(st.session_state.drafted_players))
+            st.markdown(f'''
+            <div class="metric-card">
+                <div style="font-size: 2rem; font-weight: 700; color: var(--warning-color); margin-bottom: 0.5rem;">
+                    {len(st.session_state.drafted_players)}
+                </div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">
+                    Players Drafted
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
         
-        # Player rankings table
-        st.subheader("🏆 Player Rankings")
+        # Modern Player Rankings with Card Design
+        st.markdown('<h2 class="section-header">🏆 Player Rankings</h2>', unsafe_allow_html=True)
         
         if not st.session_state.filtered_data.empty:
             # Display columns selection
@@ -384,39 +675,53 @@ def main():
             if display_cols:
                 display_data = st.session_state.filtered_data[display_cols].copy()
                 
-                # Add draft buttons
+                # Modern Player Cards
                 if 'Player' in display_cols:
-                    player_col_idx = display_cols.index('Player')
-                    
-                    # Create a custom dataframe with draft buttons
                     for idx, row in display_data.iterrows():
                         player_name = row['Player']
                         if player_name not in st.session_state.drafted_players:
-                            col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 1])
+                            # Create modern player card
+                            st.markdown(f'''
+                            <div class="player-card">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                    <div>
+                                        <div class="player-name">{player_name}</div>
+                                        <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                            {row['Team']} • {row['Position']}
+                                        </div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">
+                                            {row['FPPG']:.1f}
+                                        </div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">
+                                            FPPG
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            ''', unsafe_allow_html=True)
                             
-                            with col1:
-                                st.write(f"**{player_name}**")
+                            # Stats row
+                            stats_html = '<div class="player-stats">'
+                            for col in display_cols:
+                                if col not in ['Player', 'Team', 'Position', 'FPPG']:
+                                    stats_html += f'''
+                                    <div class="stat-item">
+                                        {col}: <span class="stat-value">{row[col]:.1f}</span>
+                                    </div>
+                                    '''
+                            stats_html += '</div>'
+                            st.markdown(stats_html, unsafe_allow_html=True)
                             
+                            # Draft button
+                            col1, col2, col3 = st.columns([1, 1, 1])
                             with col2:
-                                st.write(f"**{row['Team']}**")
-                            
-                            with col3:
-                                st.write(f"**{row['Position']}**")
-                            
-                            with col4:
-                                st.write(f"**{row['FPPG']:.1f}**")
-                            
-                            with col5:
-                                if st.button("Draft", key=f"draft_{player_name}"):
+                                if st.button("🎯 Draft Player", key=f"draft_{player_name}", help=f"Draft {player_name}"):
                                     st.session_state.drafted_players.add(player_name)
                                     st.rerun()
                             
-                            # Show other stats in a compact format
-                            if len(display_cols) > 4:
-                                stats_text = " | ".join([f"{col}: {row[col]:.1f}" for col in display_cols[4:] if col != 'Player'])
-                                st.caption(stats_text)
-                            
-                            st.divider()
+                            st.markdown('<br>', unsafe_allow_html=True)
                 
                 # Alternative: Show as dataframe with draft functionality
                 st.subheader("📊 Full Rankings Table")
@@ -441,45 +746,91 @@ def main():
                     hide_index=True
                 )
                 
-                # Quick draft buttons for top players
-                st.subheader("⚡ Quick Draft (Top 10 Available)")
+                # Modern Quick Draft Grid
+                st.markdown('<h2 class="section-header">⚡ Quick Draft</h2>', unsafe_allow_html=True)
                 if not display_data_with_draft.empty and 'Player' in display_data_with_draft.columns:
                     top_available = display_data_with_draft.head(10)
+                    
+                    # Create modern grid layout
+                    st.markdown('<div class="quick-draft-grid">', unsafe_allow_html=True)
                     
                     cols = st.columns(5)
                     for i, (_, player) in enumerate(top_available.iterrows()):
                         if i < 10 and player['Player'] not in st.session_state.drafted_players:
                             with cols[i % 5]:
-                                if st.button(f"Draft {player['Player']}", key=f"quick_draft_{player['Player']}"):
+                                st.markdown(f'''
+                                <div class="quick-draft-item">
+                                    <div style="font-weight: 600; margin-bottom: 0.5rem;">{player['Player']}</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                                        {player['Team']} • {player['Position']}
+                                    </div>
+                                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary-color); margin-bottom: 0.75rem;">
+                                        {player['FPPG']:.1f} FPPG
+                                    </div>
+                                </div>
+                                ''', unsafe_allow_html=True)
+                                
+                                if st.button("🎯 Draft", key=f"quick_draft_{player['Player']}", help=f"Draft {player['Player']}"):
                                     st.session_state.drafted_players.add(player['Player'])
                                     st.rerun()
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
         
         else:
             st.warning("No players match your current filters.")
         
-        # Position distribution chart
+        # Modern Analytics Charts
         if not st.session_state.filtered_data.empty and len(st.session_state.filtered_data) > 1:
-            st.subheader("📊 Position Distribution")
+            st.markdown('<h2 class="section-header">📊 Analytics Dashboard</h2>', unsafe_allow_html=True)
             
-            position_counts = st.session_state.filtered_data['Position'].value_counts()
+            col1, col2 = st.columns(2)
             
-            fig = px.pie(
-                values=position_counts.values,
-                names=position_counts.index,
-                title="Available Players by Position"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            with col1:
+                st.markdown('<div class="stats-card">', unsafe_allow_html=True)
+                st.markdown('<h3 style="font-family: Inter, sans-serif; font-weight: 600; margin-bottom: 1rem;">Position Distribution</h3>', unsafe_allow_html=True)
+                
+                position_counts = st.session_state.filtered_data['Position'].value_counts()
+                
+                fig = px.pie(
+                    values=position_counts.values,
+                    names=position_counts.index,
+                    color_discrete_sequence=['#2563eb', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6']
+                )
+                fig.update_layout(
+                    font_family="Inter",
+                    font_size=12,
+                    showlegend=True,
+                    legend=dict(
+                        orientation="v",
+                        yanchor="middle",
+                        y=0.5,
+                        xanchor="left",
+                        x=1.01
+                    )
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
             
-            # FPPG distribution by position
-            st.subheader("📈 FPPG Distribution by Position")
-            
-            fig_box = px.box(
-                st.session_state.filtered_data,
-                x='Position',
-                y='FPPG',
-                title="Fantasy Points Per Game by Position"
-            )
-            st.plotly_chart(fig_box, use_container_width=True)
+            with col2:
+                st.markdown('<div class="stats-card">', unsafe_allow_html=True)
+                st.markdown('<h3 style="font-family: Inter, sans-serif; font-weight: 600; margin-bottom: 1rem;">FPPG by Position</h3>', unsafe_allow_html=True)
+                
+                fig_box = px.box(
+                    st.session_state.filtered_data,
+                    x='Position',
+                    y='FPPG',
+                    color='Position',
+                    color_discrete_sequence=['#2563eb', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6']
+                )
+                fig_box.update_layout(
+                    font_family="Inter",
+                    font_size=12,
+                    showlegend=False,
+                    xaxis_title="Position",
+                    yaxis_title="Fantasy Points Per Game"
+                )
+                st.plotly_chart(fig_box, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
