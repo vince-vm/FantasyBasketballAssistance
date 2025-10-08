@@ -680,19 +680,23 @@ def main():
                     for idx, row in display_data.iterrows():
                         player_name = row['Player']
                         if player_name not in st.session_state.drafted_players:
-                            # Create modern player card
+                            # Create modern player card with safe column access
+                            team = row.get('Team', 'UNK')
+                            position = row.get('Position', 'UNK')
+                            fppg = row.get('FPPG', 0)
+                            
                             st.markdown(f'''
                             <div class="player-card">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                     <div>
                                         <div class="player-name">{player_name}</div>
                                         <div style="font-size: 0.875rem; color: var(--text-secondary);">
-                                            {row['Team']} • {row['Position']}
+                                            {team} • {position}
                                         </div>
                                     </div>
                                     <div style="text-align: right;">
                                         <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">
-                                            {row['FPPG']:.1f}
+                                            {fppg:.1f}
                                         </div>
                                         <div style="font-size: 0.75rem; color: var(--text-muted);">
                                             FPPG
@@ -705,12 +709,20 @@ def main():
                             # Stats row
                             stats_html = '<div class="player-stats">'
                             for col in display_cols:
-                                if col not in ['Player', 'Team', 'Position', 'FPPG']:
-                                    stats_html += f'''
-                                    <div class="stat-item">
-                                        {col}: <span class="stat-value">{row[col]:.1f}</span>
-                                    </div>
-                                    '''
+                                if col not in ['Player', 'Team', 'Position', 'FPPG'] and col in row.index:
+                                    try:
+                                        stats_html += f'''
+                                        <div class="stat-item">
+                                            {col}: <span class="stat-value">{row[col]:.1f}</span>
+                                        </div>
+                                        '''
+                                    except (ValueError, TypeError):
+                                        # Handle non-numeric values
+                                        stats_html += f'''
+                                        <div class="stat-item">
+                                            {col}: <span class="stat-value">{row[col]}</span>
+                                        </div>
+                                        '''
                             stats_html += '</div>'
                             st.markdown(stats_html, unsafe_allow_html=True)
                             
@@ -758,14 +770,19 @@ def main():
                     for i, (_, player) in enumerate(top_available.iterrows()):
                         if i < 10 and player['Player'] not in st.session_state.drafted_players:
                             with cols[i % 5]:
+                                # Safely get values with fallbacks
+                                team = player.get('Team', 'UNK')
+                                position = player.get('Position', 'UNK')
+                                fppg = player.get('FPPG', 0)
+                                
                                 st.markdown(f'''
                                 <div class="quick-draft-item">
                                     <div style="font-weight: 600; margin-bottom: 0.5rem;">{player['Player']}</div>
                                     <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
-                                        {player['Team']} • {player['Position']}
+                                        {team} • {position}
                                     </div>
                                     <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary-color); margin-bottom: 0.75rem;">
-                                        {player['FPPG']:.1f} FPPG
+                                        {fppg:.1f} FPPG
                                     </div>
                                 </div>
                                 ''', unsafe_allow_html=True)
