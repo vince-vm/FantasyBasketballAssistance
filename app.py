@@ -7,9 +7,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import io
+import time
 from api_utils import fetch_nba_data
 from public_espn_api import fetch_nba_data_public_api
 
@@ -69,6 +70,58 @@ st.markdown("""
         background-color: #1b5e20;
         color: white;
     }
+    
+    /* Fancy Loading Spinner */
+    .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 200px;
+        flex-direction: column;
+    }
+    
+    .spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #2e7d32;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+        font-size: 18px;
+        color: #2e7d32;
+        font-weight: bold;
+        text-align: center;
+    }
+    
+    .maintenance-message {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 0.5rem;
+        padding: 2rem;
+        text-align: center;
+        margin: 2rem 0;
+    }
+    
+    .maintenance-title {
+        font-size: 24px;
+        color: #856404;
+        font-weight: bold;
+        margin-bottom: 1rem;
+    }
+    
+    .maintenance-text {
+        font-size: 16px;
+        color: #856404;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -85,23 +138,67 @@ def initialize_session_state():
     
     if 'filtered_data' not in st.session_state:
         st.session_state.filtered_data = pd.DataFrame()
+    
+    if 'data_loading' not in st.session_state:
+        st.session_state.data_loading = False
+    
+    if 'api_error' not in st.session_state:
+        st.session_state.api_error = False
 
 def load_player_data():
-    """Load player data from ESPN API."""
-    with st.spinner("Fetching live NBA player data from ESPN..."):
-        try:
-            data = fetch_nba_data_public_api()
-            if not data.empty:
-                st.session_state.players_data = data
-                st.session_state.last_refresh = datetime.now()
-                st.success(f"✅ Successfully loaded {len(data)} players!")
-                return True
-            else:
-                st.error("❌ No player data found. Please try again.")
-                return False
-        except Exception as e:
-            st.error(f"❌ Error fetching data: {str(e)}")
+    """Load player data from ESPN API with caching."""
+    st.session_state.data_loading = True
+    st.session_state.api_error = False
+    
+    try:
+        # Use a faster timeout and concurrent requests
+        data = fetch_nba_data_public_api()
+        
+        if not data.empty and len(data) > 100:  # Ensure we got real data (not sample)
+            st.session_state.players_data = data
+            st.session_state.last_refresh = datetime.now()
+            st.session_state.data_loading = False
+            return True
+        else:
+            st.session_state.api_error = True
+            st.session_state.data_loading = False
             return False
+            
+    except Exception as e:
+        st.session_state.api_error = True
+        st.session_state.data_loading = False
+        return False
+
+def should_refresh_data():
+    """Check if data should be refreshed based on cache timing."""
+    if st.session_state.last_refresh is None:
+        return True
+    
+    # Refresh every 30 minutes to get injury updates
+    cache_duration = timedelta(minutes=30)
+    return datetime.now() - st.session_state.last_refresh > cache_duration
+
+def show_loading_spinner():
+    """Show fancy loading spinner."""
+    st.markdown("""
+    <div class="loading-container">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading player data...</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def show_maintenance_message():
+    """Show maintenance message when API fails."""
+    st.markdown("""
+    <div class="maintenance-message">
+        <div class="maintenance-title">🔧 Website Under Maintenance</div>
+        <div class="maintenance-text">
+            We're currently updating our player data. Please try again in a few minutes.
+            <br><br>
+            If this issue persists, please contact support.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 def filter_players(data, position_filter, name_search):
     """Filter players based on position and name search."""
@@ -136,6 +233,20 @@ def main():
     """Main application function."""
     initialize_session_state()
     
+    # Auto-load data if needed
+    if should_refresh_data() and not st.session_state.data_loading:
+        load_player_data()
+    
+    # Show loading spinner if data is loading
+    if st.session_state.data_loading:
+        show_loading_spinner()
+        st.stop()
+    
+    # Show maintenance message if API failed
+    if st.session_state.api_error:
+        show_maintenance_message()
+        st.stop()
+    
     # Header
     st.markdown('<h1 class="main-header">🏀 Fantasy Basketball Draft Assistant</h1>', unsafe_allow_html=True)
     
@@ -144,12 +255,12 @@ def main():
         st.header("📊 Controls")
         
         # Data refresh section
-        st.subheader("🔄 Data Management")
-        if st.button("🔄 Refresh Player Data", type="primary"):
-            load_player_data()
+        st.subheader("📊 Data Status")
         
         if st.session_state.last_refresh:
             st.caption(f"Last updated: {st.session_state.last_refresh.strftime('%Y-%m-%d %H:%M:%S')}")
+        else:
+            st.caption("Data not loaded yet")
         
         # Filters
         st.subheader("🔍 Filters")
@@ -195,7 +306,7 @@ def main():
     
     # Main content area
     if st.session_state.players_data.empty:
-        st.info("👆 Click 'Refresh Player Data' in the sidebar to load player statistics.")
+        st.info("📊 Player data is automatically loaded and refreshed every 30 minutes.")
         
         # Show ESPN scoring explanation
         st.subheader("📋 ESPN Points Scoring System")

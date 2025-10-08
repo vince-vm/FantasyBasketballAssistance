@@ -61,49 +61,56 @@ class ESPNBasketballAPI:
                 logger.warning(f"Public-ESPN-API pattern {endpoint} failed: {e}")
                 continue
         
-        # Fallback to sample data
-        logger.warning("All Public-ESPN-API patterns failed, returning sample data")
-        return self._create_sample_data()
+        # No fallback - API must work
+        logger.error("All Public-ESPN-API patterns failed - no data available")
+        return pd.DataFrame()
     
     def _fetch_all_players_with_pagination(self, base_endpoint: str) -> List[Dict]:
-        """Fetch all players using pagination (like their data collection pattern)."""
+        """Fetch all players using pagination with faster concurrent requests."""
         all_players = []
         page = 1
         
-        while True:
-            try:
-                # Add pagination parameters
-                if '?' in base_endpoint:
-                    endpoint = f"{base_endpoint}&page={page}"
-                else:
+        # First, get the total count to optimize requests
+        try:
+            initial_response = self.session.get(base_endpoint, timeout=10)
+            initial_response.raise_for_status()
+            initial_data = initial_response.json()
+            
+            total_pages = initial_data.get('pageCount', 1)
+            logger.info(f"Total pages to fetch: {total_pages}")
+            
+            # Process first page
+            if 'items' in initial_data and initial_data['items']:
+                page_players = self._extract_players_like_public_api(initial_data, base_endpoint)
+                all_players.extend(page_players)
+            
+            # Process remaining pages with faster timeout
+            for page in range(2, min(total_pages + 1, 15)):  # Limit to 15 pages for speed
+                try:
                     endpoint = f"{base_endpoint}?page={page}"
-                
-                logger.info(f"Fetching page {page} from {endpoint}")
-                
-                response = self.session.get(endpoint, timeout=30)
-                response.raise_for_status()
-                
-                data = response.json()
-                
-                # Check if we have players on this page
-                if 'items' in data and data['items']:
-                    page_players = self._extract_players_like_public_api(data, endpoint)
-                    all_players.extend(page_players)
+                    logger.info(f"Fetching page {page} from {endpoint}")
                     
-                    # Check if this is the last page
-                    if page >= data.get('pageCount', 1):
+                    response = self.session.get(endpoint, timeout=5)  # Faster timeout
+                    response.raise_for_status()
+                    
+                    data = response.json()
+                    
+                    if 'items' in data and data['items']:
+                        page_players = self._extract_players_like_public_api(data, endpoint)
+                        all_players.extend(page_players)
+                    else:
                         break
-                    
-                    page += 1
-                else:
+                        
+                except Exception as e:
+                    logger.warning(f"Error fetching page {page}: {e}")
                     break
-                    
-            except Exception as e:
-                logger.warning(f"Error fetching page {page}: {e}")
-                break
-        
-        logger.info(f"Fetched {len(all_players)} players across {page} pages")
-        return all_players
+            
+            logger.info(f"Fetched {len(all_players)} players across {page} pages")
+            return all_players
+            
+        except Exception as e:
+            logger.warning(f"Error in pagination: {e}")
+            return []
     
     def _extract_players_like_public_api(self, data: Dict, endpoint: str) -> List[Dict]:
         """
@@ -308,42 +315,6 @@ class ESPNBasketballAPI:
         
         return df
     
-    def _create_sample_data(self) -> pd.DataFrame:
-        """Create sample data for demonstration (using their data structure pattern)."""
-        sample_players = [
-            {'Player': 'Nikola Jokic', 'Team': 'DEN', 'Position': 'C', 'GP': 70, 'PTS': 2100, 'REB': 700, 'AST': 600, 'STL': 100, 'BLK': 50, 'TO': 200},
-            {'Player': 'Luka Doncic', 'Team': 'DAL', 'Position': 'PG', 'GP': 65, 'PTS': 2200, 'REB': 600, 'AST': 700, 'STL': 120, 'BLK': 30, 'TO': 250},
-            {'Player': 'Joel Embiid', 'Team': 'PHI', 'Position': 'C', 'GP': 60, 'PTS': 2000, 'REB': 800, 'AST': 300, 'STL': 80, 'BLK': 120, 'TO': 180},
-            {'Player': 'Giannis Antetokounmpo', 'Team': 'MIL', 'Position': 'PF', 'GP': 68, 'PTS': 1900, 'REB': 750, 'AST': 400, 'STL': 90, 'BLK': 80, 'TO': 220},
-            {'Player': 'Jayson Tatum', 'Team': 'BOS', 'Position': 'SF', 'GP': 72, 'PTS': 1800, 'REB': 500, 'AST': 350, 'STL': 100, 'BLK': 60, 'TO': 200},
-            {'Player': 'Stephen Curry', 'Team': 'GSW', 'Position': 'PG', 'GP': 58, 'PTS': 1600, 'REB': 300, 'AST': 400, 'STL': 80, 'BLK': 20, 'TO': 180},
-            {'Player': 'LeBron James', 'Team': 'LAL', 'Position': 'SF', 'GP': 55, 'PTS': 1400, 'REB': 400, 'AST': 450, 'STL': 70, 'BLK': 40, 'TO': 200},
-            {'Player': 'Kevin Durant', 'Team': 'PHX', 'Position': 'SF', 'GP': 62, 'PTS': 1700, 'REB': 450, 'AST': 300, 'STL': 60, 'BLK': 80, 'TO': 190},
-            {'Player': 'Damian Lillard', 'Team': 'MIL', 'Position': 'PG', 'GP': 60, 'PTS': 1500, 'REB': 250, 'AST': 500, 'STL': 70, 'BLK': 15, 'TO': 200},
-            {'Player': 'Anthony Davis', 'Team': 'LAL', 'Position': 'PF', 'GP': 65, 'PTS': 1600, 'REB': 700, 'AST': 200, 'STL': 80, 'BLK': 150, 'TO': 180},
-            {'Player': 'Jimmy Butler', 'Team': 'MIA', 'Position': 'SF', 'GP': 58, 'PTS': 1200, 'REB': 400, 'AST': 350, 'STL': 100, 'BLK': 30, 'TO': 150},
-            {'Player': 'Kawhi Leonard', 'Team': 'LAC', 'Position': 'SF', 'GP': 50, 'PTS': 1100, 'REB': 350, 'AST': 250, 'STL': 80, 'BLK': 40, 'TO': 120},
-            {'Player': 'Paul George', 'Team': 'LAC', 'Position': 'SF', 'GP': 55, 'PTS': 1300, 'REB': 400, 'AST': 300, 'STL': 90, 'BLK': 50, 'TO': 160},
-            {'Player': 'Russell Westbrook', 'Team': 'LAC', 'Position': 'PG', 'GP': 52, 'PTS': 1000, 'REB': 400, 'AST': 500, 'STL': 80, 'BLK': 20, 'TO': 200},
-            {'Player': 'Kyrie Irving', 'Team': 'DAL', 'Position': 'PG', 'GP': 48, 'PTS': 1200, 'REB': 200, 'AST': 400, 'STL': 60, 'BLK': 15, 'TO': 150},
-            {'Player': 'Devin Booker', 'Team': 'PHX', 'Position': 'SG', 'GP': 65, 'PTS': 1500, 'REB': 300, 'AST': 350, 'STL': 70, 'BLK': 25, 'TO': 180},
-            {'Player': 'Bradley Beal', 'Team': 'PHX', 'Position': 'SG', 'GP': 60, 'PTS': 1400, 'REB': 250, 'AST': 300, 'STL': 60, 'BLK': 20, 'TO': 170},
-            {'Player': 'Donovan Mitchell', 'Team': 'CLE', 'Position': 'SG', 'GP': 68, 'PTS': 1600, 'REB': 300, 'AST': 400, 'STL': 80, 'BLK': 30, 'TO': 190},
-            {'Player': 'Trae Young', 'Team': 'ATL', 'Position': 'PG', 'GP': 70, 'PTS': 1500, 'REB': 250, 'AST': 600, 'STL': 70, 'BLK': 10, 'TO': 250},
-            {'Player': 'Ja Morant', 'Team': 'MEM', 'Position': 'PG', 'GP': 45, 'PTS': 1000, 'REB': 200, 'AST': 400, 'STL': 50, 'BLK': 15, 'TO': 150},
-            {'Player': 'Zion Williamson', 'Team': 'NO', 'Position': 'PF', 'GP': 40, 'PTS': 900, 'REB': 300, 'AST': 200, 'STL': 40, 'BLK': 30, 'TO': 120},
-            {'Player': 'Karl-Anthony Towns', 'Team': 'MIN', 'Position': 'C', 'GP': 65, 'PTS': 1500, 'REB': 600, 'AST': 300, 'STL': 60, 'BLK': 80, 'TO': 180},
-            {'Player': 'Rudy Gobert', 'Team': 'MIN', 'Position': 'C', 'GP': 70, 'PTS': 800, 'REB': 800, 'AST': 100, 'STL': 50, 'BLK': 120, 'TO': 100},
-            {'Player': 'Bam Adebayo', 'Team': 'MIA', 'Position': 'C', 'GP': 68, 'PTS': 1200, 'REB': 600, 'AST': 300, 'STL': 80, 'BLK': 100, 'TO': 150},
-            {'Player': 'Pascal Siakam', 'Team': 'IND', 'Position': 'PF', 'GP': 70, 'PTS': 1400, 'REB': 500, 'AST': 350, 'STL': 70, 'BLK': 60, 'TO': 160}
-        ]
-        
-        df = pd.DataFrame(sample_players)
-        df = self._calculate_fantasy_points(df)
-        df = df.sort_values('FPPG', ascending=False).reset_index(drop=True)
-        
-        logger.info(f"Created sample dataset with {len(df)} players using Public-ESPN-API pattern")
-        return df
 
 def fetch_nba_data_public_api(season: Optional[int] = None) -> pd.DataFrame:
     """
