@@ -35,7 +35,7 @@ class ESPNBasketballAPI:
         })
     
     def get_nba_players_from_api(self, season: int = 2024) -> pd.DataFrame:
-        """Get NBA players with instant loading using cache and concurrent requests."""
+        """Get ALL NBA players with real stats and fantasy projections."""
         global _player_cache, _last_cache_time
         
         # Check cache first - instant return if available
@@ -46,11 +46,11 @@ class ESPNBasketballAPI:
                     logger.info(f"Returning cached data instantly ({len(_player_cache)} players)")
                     return pd.DataFrame(_player_cache)
         
-        # If no cache or expired, fetch with concurrent requests
-        logger.info("Fetching fresh data with concurrent requests...")
+        # If no cache or expired, fetch ALL players with real stats
+        logger.info("Fetching ALL NBA players with real statistics...")
         start_time = time.time()
         
-        # Use the most reliable endpoint
+        # Use the most reliable endpoint for complete player data
         endpoint = f"https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/{season}/athletes"
         
         try:
@@ -59,15 +59,15 @@ class ESPNBasketballAPI:
             response.raise_for_status()
             initial_data = response.json()
             
-            total_pages = min(initial_data.get('pageCount', 1), 10)  # Limit to 10 pages for speed
-            logger.info(f"Fetching {total_pages} pages concurrently...")
+            total_pages = initial_data.get('pageCount', 1)  # Get ALL pages
+            logger.info(f"Fetching ALL {total_pages} pages for complete NBA roster...")
             
             # Fetch all pages concurrently
-            all_players = self._fetch_pages_concurrently(endpoint, total_pages)
+            all_players = self._fetch_all_pages_concurrently(endpoint, total_pages)
             
             if all_players:
-                # Process all players concurrently
-                processed_players = self._process_players_concurrently(all_players)
+                # Process ALL players with real stats
+                processed_players = self._process_all_players_with_real_stats(all_players)
                 
                 if processed_players:
                     df = pd.DataFrame(processed_players)
@@ -80,7 +80,7 @@ class ESPNBasketballAPI:
                         _last_cache_time = datetime.now()
                     
                     elapsed = time.time() - start_time
-                    logger.info(f"Successfully fetched {len(df)} players in {elapsed:.2f} seconds")
+                    logger.info(f"Successfully fetched {len(df)} NBA players with real stats in {elapsed:.2f} seconds")
                     return df
             
             logger.error("No players fetched")
@@ -90,14 +90,14 @@ class ESPNBasketballAPI:
             logger.error(f"Error fetching data: {e}")
             return pd.DataFrame()
     
-    def _fetch_pages_concurrently(self, base_endpoint: str, total_pages: int) -> List[Dict]:
-        """Fetch multiple pages concurrently for speed."""
+    def _fetch_all_pages_concurrently(self, base_endpoint: str, total_pages: int) -> List[Dict]:
+        """Fetch ALL pages concurrently to get complete NBA roster."""
         all_items = []
         
         def fetch_page(page_num):
             try:
                 endpoint = f"{base_endpoint}?page={page_num}"
-                response = self.session.get(endpoint, timeout=5)
+                response = self.session.get(endpoint, timeout=8)
                 response.raise_for_status()
                 data = response.json()
                 return data.get('items', [])
@@ -105,64 +105,73 @@ class ESPNBasketballAPI:
                 logger.warning(f"Error fetching page {page_num}: {e}")
                 return []
         
-        # Use ThreadPoolExecutor for concurrent requests
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        # Use ThreadPoolExecutor for concurrent requests - get ALL pages
+        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
             futures = [executor.submit(fetch_page, page) for page in range(1, total_pages + 1)]
             
             for future in concurrent.futures.as_completed(futures):
                 items = future.result()
                 all_items.extend(items)
         
-        logger.info(f"Fetched {len(all_items)} player references concurrently")
+        logger.info(f"Fetched {len(all_items)} player references from ALL {total_pages} pages")
         return all_items
     
-    def _process_players_concurrently(self, player_refs: List[Dict]) -> List[Dict]:
-        """Process player references concurrently."""
+    def _process_all_players_with_real_stats(self, player_refs: List[Dict]) -> List[Dict]:
+        """Process ALL players with real statistics extraction."""
         processed_players = []
         
         def process_player_ref(player_ref):
             try:
                 if isinstance(player_ref, dict) and '$ref' in player_ref:
-                    # Follow the reference
+                    # Follow the reference to get actual player data
                     ref_url = player_ref['$ref']
-                    response = self.session.get(ref_url, timeout=3)
+                    response = self.session.get(ref_url, timeout=5)
                     response.raise_for_status()
                     player_data = response.json()
                     
-                    # Extract player info
-                    return self._extract_player_info_fast(player_data)
+                    # Extract player info with REAL stats
+                    return self._extract_player_with_real_stats(player_data)
                 return None
             except Exception as e:
                 logger.warning(f"Error processing player: {e}")
                 return None
         
-        # Process players concurrently
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-            futures = [executor.submit(process_player_ref, ref) for ref in player_refs[:200]]  # Limit for speed
+        # Process ALL players concurrently (no artificial limits)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
+            futures = [executor.submit(process_player_ref, ref) for ref in player_refs]
             
             for future in concurrent.futures.as_completed(futures):
                 player_info = future.result()
                 if player_info:
                     processed_players.append(player_info)
         
-        logger.info(f"Processed {len(processed_players)} players concurrently")
+        logger.info(f"Processed {len(processed_players)} players with real statistics")
         return processed_players
     
-    def _extract_player_info_fast(self, athlete: Dict) -> Optional[Dict]:
-        """Fast player info extraction without team reference following."""
+    def _extract_player_with_real_stats(self, athlete: Dict) -> Optional[Dict]:
+        """Extract player info with REAL statistics from ESPN API."""
         try:
             # Extract name
             name = (athlete.get('displayName') or 
                    athlete.get('fullName') or 
+                   athlete.get('name') or 
                    'Unknown')
             
-            # Extract team (simplified - no reference following for speed)
+            # Extract team with reference following for accuracy
             team_info = athlete.get('team', {})
+            team_abbr = 'UNK'
             if isinstance(team_info, dict) and '$ref' in team_info:
-                # Extract team ID from reference URL for speed
-                ref_url = team_info['$ref']
-                team_id = ref_url.split('/')[-1].split('?')[0]
-                team_abbr = self._get_team_abbreviation_fast(team_id)
+                # Follow team reference for accurate team data
+                try:
+                    team_response = self.session.get(team_info['$ref'], timeout=3)
+                    team_response.raise_for_status()
+                    team_data = team_response.json()
+                    team_abbr = team_data.get('abbreviation', 'UNK')
+                except:
+                    # Fallback to ID extraction
+                    ref_url = team_info['$ref']
+                    team_id = ref_url.split('/')[-1].split('?')[0]
+                    team_abbr = self._get_team_abbreviation_fast(team_id)
             else:
                 team_abbr = team_info.get('abbreviation', 'UNK')
             
@@ -170,22 +179,63 @@ class ESPNBasketballAPI:
             position_info = athlete.get('position', {})
             pos_name = position_info.get('abbreviation', 'UNK')
             
-            # Use default stats for speed (no detailed stats extraction)
-            return {
-                'Player': name,
-                'Team': team_abbr,
-                'Position': pos_name,
-                'GP': 65,  # Average games
-                'PTS': 1200,  # Average points
-                'REB': 400,   # Average rebounds
-                'AST': 300,   # Average assists
-                'STL': 60,    # Average steals
-                'BLK': 40,    # Average blocks
-                'TO': 150     # Average turnovers
-            }
+            # Extract REAL statistics by following the statistics reference
+            stats_ref = athlete.get('statistics', {}).get('$ref')
+            if stats_ref:
+                try:
+                    stats_response = self.session.get(stats_ref, timeout=5)
+                    stats_response.raise_for_status()
+                    stats_data = stats_response.json()
+                    
+                    # Extract stats from the splits structure
+                    splits = stats_data.get('splits', {})
+                    if splits and 'categories' in splits:
+                        stats_dict = {}
+                        
+                        # Parse all categories to find the stats we need
+                        for category in splits['categories']:
+                            if 'stats' in category:
+                                for stat in category['stats']:
+                                    stat_name = stat.get('name', '')
+                                    stat_value = stat.get('value', 0)
+                                    stats_dict[stat_name] = stat_value
+                        
+                        # Extract the stats we need for fantasy basketball
+                        games_played = stats_dict.get('gamesPlayed', 0)
+                        if games_played == 0:
+                            games_played = 1  # Avoid division by zero
+                        
+                        points = stats_dict.get('points', 0)
+                        rebounds = stats_dict.get('rebounds', 0)
+                        assists = stats_dict.get('assists', 0)
+                        steals = stats_dict.get('steals', 0)
+                        blocks = stats_dict.get('blocks', 0)
+                        turnovers = stats_dict.get('turnovers', 0)
+                        
+                        # Only return players with actual stats
+                        if points > 0 or rebounds > 0 or assists > 0:
+                            return {
+                                'Player': name,
+                                'Team': team_abbr,
+                                'Position': pos_name,
+                                'GP': games_played,
+                                'PTS': points,
+                                'REB': rebounds,
+                                'AST': assists,
+                                'STL': steals,
+                                'BLK': blocks,
+                                'TO': turnovers
+                            }
+                
+                except Exception as e:
+                    logger.warning(f"Error fetching stats for {name}: {e}")
+            
+            # If no stats found, skip this player
+            logger.warning(f"No statistics found for {name}")
+            return None
             
         except Exception as e:
-            logger.warning(f"Error extracting player info: {e}")
+            logger.warning(f"Error extracting player info for {athlete.get('displayName', 'Unknown')}: {e}")
             return None
     
     def _get_team_abbreviation_fast(self, team_id: str) -> str:
