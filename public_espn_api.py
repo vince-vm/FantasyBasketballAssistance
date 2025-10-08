@@ -31,15 +31,15 @@ class ESPNBasketballAPI:
         Based on their soccer endpoint pattern:
         https://site.web.api.espn.com/apis/v2/sports/soccer/{league_code}/standings?season={year}
         
-        Adapted for basketball:
-        https://site.web.api.espn.com/apis/v2/sports/basketball/nba/athletes
+        Adapted for basketball with pagination to get all players:
+        https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/{season}/athletes
         """
         
         # Try multiple basketball endpoints based on their pattern
         endpoints = [
+            f"https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/{season}/athletes",
             f"https://site.web.api.espn.com/apis/v2/sports/basketball/nba/athletes",
             f"https://site.web.api.espn.com/apis/v2/sports/basketball/nba/seasons/{season}/athletes",
-            f"https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/{season}/athletes",
             f"https://fantasy.espn.com/apis/v3/games/fba/seasons/{season}/players"
         ]
         
@@ -47,17 +47,11 @@ class ESPNBasketballAPI:
             try:
                 logger.info(f"Trying Public-ESPN-API pattern: {endpoint}")
                 
-                # Use their exact request pattern
-                response = self.session.get(endpoint, timeout=30)
-                response.raise_for_status()
+                # Get all players using pagination
+                all_players_data = self._fetch_all_players_with_pagination(endpoint)
                 
-                data = response.json()
-                
-                # Process the response using their data extraction pattern
-                players_data = self._extract_players_like_public_api(data, endpoint)
-                
-                if players_data:
-                    df = pd.DataFrame(players_data)
+                if all_players_data:
+                    df = pd.DataFrame(all_players_data)
                     df = self._calculate_fantasy_points(df)
                     df = df.sort_values('FPPG', ascending=False).reset_index(drop=True)
                     logger.info(f"Successfully fetched {len(df)} players using Public-ESPN-API pattern")
@@ -70,6 +64,46 @@ class ESPNBasketballAPI:
         # Fallback to sample data
         logger.warning("All Public-ESPN-API patterns failed, returning sample data")
         return self._create_sample_data()
+    
+    def _fetch_all_players_with_pagination(self, base_endpoint: str) -> List[Dict]:
+        """Fetch all players using pagination (like their data collection pattern)."""
+        all_players = []
+        page = 1
+        
+        while True:
+            try:
+                # Add pagination parameters
+                if '?' in base_endpoint:
+                    endpoint = f"{base_endpoint}&page={page}"
+                else:
+                    endpoint = f"{base_endpoint}?page={page}"
+                
+                logger.info(f"Fetching page {page} from {endpoint}")
+                
+                response = self.session.get(endpoint, timeout=30)
+                response.raise_for_status()
+                
+                data = response.json()
+                
+                # Check if we have players on this page
+                if 'items' in data and data['items']:
+                    page_players = self._extract_players_like_public_api(data, endpoint)
+                    all_players.extend(page_players)
+                    
+                    # Check if this is the last page
+                    if page >= data.get('pageCount', 1):
+                        break
+                    
+                    page += 1
+                else:
+                    break
+                    
+            except Exception as e:
+                logger.warning(f"Error fetching page {page}: {e}")
+                break
+        
+        logger.info(f"Fetched {len(all_players)} players across {page} pages")
+        return all_players
     
     def _extract_players_like_public_api(self, data: Dict, endpoint: str) -> List[Dict]:
         """
@@ -97,7 +131,7 @@ class ESPNBasketballAPI:
                 return []
             
             # ESPN API returns references, so we need to follow them
-            for athlete_ref in athletes[:50]:  # Limit to first 50 for testing
+            for athlete_ref in athletes:  # Process all players on this page
                 try:
                     # Check if this is a reference that needs to be followed
                     if isinstance(athlete_ref, dict) and '$ref' in athlete_ref:
