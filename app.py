@@ -11,6 +11,7 @@ from datetime import datetime
 import json
 import io
 from api_utils import fetch_nba_data
+from public_espn_api import fetch_nba_data_public_api
 
 # Page configuration
 st.set_page_config(
@@ -89,7 +90,7 @@ def load_player_data():
     """Load player data from ESPN API."""
     with st.spinner("Fetching live NBA player data from ESPN..."):
         try:
-            data = fetch_nba_data()
+            data = fetch_nba_data_public_api()
             if not data.empty:
                 st.session_state.players_data = data
                 st.session_state.last_refresh = datetime.now()
