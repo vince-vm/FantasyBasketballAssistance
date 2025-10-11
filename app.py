@@ -1,371 +1,231 @@
-"""
-Fantasy Basketball Draft Assistant
-A Streamlit web app for NBA fantasy basketball draft preparation.
-"""
-
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime
-import json
-import io
-from api_utils import fetch_nba_data
+import numpy as np
+from io import StringIO
 
 # Page configuration
 st.set_page_config(
     page_title="Fantasy Basketball Draft Assistant",
     page_icon="🏀",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Custom CSS for modern styling
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 3rem;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 2rem;
-        background: linear-gradient(90deg, #1f4e79, #2e7d32);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-    
-    .metric-card {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #2e7d32;
-        margin: 0.5rem 0;
-    }
-    
-    .draft-tracker {
-        background-color: #fff3cd;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #ffc107;
-        margin: 1rem 0;
-    }
-    
-    .stDataFrame {
-        border-radius: 0.5rem;
-        overflow: hidden;
-    }
-    
-    .stButton > button {
-        background-color: #2e7d32;
-        color: white;
-        border-radius: 0.5rem;
-        border: none;
-        padding: 0.5rem 1rem;
-        font-weight: bold;
-    }
-    
-    .stButton > button:hover {
-        background-color: #1b5e20;
-        color: white;
-    }
-</style>
-""", unsafe_allow_html=True)
+# ESPN Default Scoring Weights
+SCORING_WEIGHTS = {
+    'PTS': 1.0,
+    'REB': 1.2,
+    'AST': 1.5,
+    'STL': 3.0,
+    'BLK': 3.0,
+    'TO': -1.0
+}
 
-def initialize_session_state():
-    """Initialize session state variables."""
-    if 'players_data' not in st.session_state:
-        st.session_state.players_data = pd.DataFrame()
-    
-    if 'drafted_players' not in st.session_state:
-        st.session_state.drafted_players = set()
-    
-    if 'last_refresh' not in st.session_state:
-        st.session_state.last_refresh = None
-    
-    if 'filtered_data' not in st.session_state:
-        st.session_state.filtered_data = pd.DataFrame()
+def calculate_fantasy_points(row):
+    """Calculate fantasy points per game using ESPN scoring system"""
+    fppg = 0
+    for stat, weight in SCORING_WEIGHTS.items():
+        if stat in row and pd.notna(row[stat]):
+            fppg += row[stat] * weight
+    return fppg
 
-def load_player_data():
-    """Load player data from ESPN API."""
-    with st.spinner("Fetching live NBA player data from ESPN..."):
-        try:
-            data = fetch_nba_data()
-            if not data.empty:
-                st.session_state.players_data = data
-                st.session_state.last_refresh = datetime.now()
-                st.success(f"✅ Successfully loaded {len(data)} players!")
-                return True
-            else:
-                st.error("❌ No player data found. Please try again.")
-                return False
-        except Exception as e:
-            st.error(f"❌ Error fetching data: {str(e)}")
-            return False
+def calculate_total_fantasy_points(row):
+    """Calculate total fantasy points if GP (Games Played) exists"""
+    if 'GP' in row and pd.notna(row['GP']) and row['GP'] > 0:
+        return row['FPPG'] * row['GP']
+    return None
 
-def filter_players(data, position_filter, name_search):
-    """Filter players based on position and name search."""
-    filtered = data.copy()
+def load_and_process_data(uploaded_file):
+    """Load CSV and calculate fantasy points"""
+    try:
+        # Read CSV
+        df = pd.read_csv(uploaded_file)
+        
+        # Calculate FPPG
+        df['FPPG'] = df.apply(calculate_fantasy_points, axis=1)
+        
+        # Calculate Total if GP exists
+        df['Total'] = df.apply(calculate_total_fantasy_points, axis=1)
+        
+        return df
+    except Exception as e:
+        st.error(f"Error processing file: {str(e)}")
+        return None
+
+def filter_players(df, drafted_players, position_filter, name_filter):
+    """Filter players based on drafted status, position, and name"""
+    # Remove drafted players
+    if drafted_players:
+        df = df[~df['Player'].isin(drafted_players)]
     
     # Filter by position
-    if position_filter != "All Positions":
-        filtered = filtered[filtered['Position'] == position_filter]
+    if position_filter != "All":
+        df = df[df['Pos'] == position_filter]
     
-    # Filter by name search
-    if name_search:
-        filtered = filtered[
-            filtered['Player'].str.contains(name_search, case=False, na=False)
-        ]
+    # Filter by name
+    if name_filter:
+        df = df[df['Player'].str.contains(name_filter, case=False, na=False)]
     
-    # Remove drafted players
-    if st.session_state.drafted_players:
-        filtered = filtered[~filtered['Player'].isin(st.session_state.drafted_players)]
-    
-    return filtered
-
-def export_data(data, format_type):
-    """Export data in specified format."""
-    if format_type == "CSV":
-        csv = data.to_csv(index=False)
-        return csv.encode('utf-8'), "text/csv", "players_data.csv"
-    elif format_type == "JSON":
-        json_str = data.to_json(orient='records', indent=2)
-        return json_str.encode('utf-8'), "application/json", "players_data.json"
+    return df
 
 def main():
-    """Main application function."""
-    initialize_session_state()
+    st.title("🏀 Fantasy Basketball Draft Assistant")
+    st.markdown("**ESPN Default Scoring System** - PTS×1, REB×1.2, AST×1.5, STL×3, BLK×3, TO×-1")
     
-    # Header
-    st.markdown('<h1 class="main-header">🏀 Fantasy Basketball Draft Assistant</h1>', unsafe_allow_html=True)
+    # Initialize session state
+    if 'drafted_players' not in st.session_state:
+        st.session_state.drafted_players = []
+    if 'df' not in st.session_state:
+        st.session_state.df = None
     
-    # Sidebar
+    # Sidebar for controls
     with st.sidebar:
         st.header("📊 Controls")
         
-        # Data refresh section
-        st.subheader("🔄 Data Management")
-        if st.button("🔄 Refresh Player Data", type="primary"):
-            load_player_data()
+        # File uploader
+        uploaded_file = st.file_uploader(
+            "Upload Player Projections CSV",
+            type=['csv'],
+            help="Upload a CSV with columns: Player, Pos, PTS, REB, AST, STL, BLK, TO, GP (optional)"
+        )
         
-        if st.session_state.last_refresh:
-            st.caption(f"Last updated: {st.session_state.last_refresh.strftime('%Y-%m-%d %H:%M:%S')}")
+        if uploaded_file is not None:
+            if st.session_state.df is None or st.button("🔄 Reload Data"):
+                st.session_state.df = load_and_process_data(uploaded_file)
         
-        # Filters
-        st.subheader("🔍 Filters")
+        # Drafted players management
+        st.subheader("👥 Drafted Players")
         
-        # Position filter
-        if not st.session_state.players_data.empty:
-            positions = ["All Positions"] + sorted(st.session_state.players_data['Position'].unique().tolist())
-            position_filter = st.selectbox("Position", positions)
-        else:
-            position_filter = "All Positions"
+        # Add drafted player
+        new_drafted = st.text_input("Add drafted player:", placeholder="Enter player name")
+        if st.button("Add to Drafted") and new_drafted:
+            if new_drafted not in st.session_state.drafted_players:
+                st.session_state.drafted_players.append(new_drafted)
+                st.success(f"Added {new_drafted} to drafted list")
+            else:
+                st.warning(f"{new_drafted} is already in drafted list")
         
-        # Name search
-        name_search = st.text_input("Search Player Name", placeholder="Enter player name...")
-        
-        # Draft tracker
-        st.subheader("📝 Draft Tracker")
-        st.markdown('<div class="draft-tracker">', unsafe_allow_html=True)
-        
+        # Show drafted players
         if st.session_state.drafted_players:
-            st.write(f"**Drafted Players ({len(st.session_state.drafted_players)}):**")
-            for player in sorted(st.session_state.drafted_players):
-                if st.button(f"❌ {player}", key=f"remove_{player}"):
-                    st.session_state.drafted_players.remove(player)
-                    st.rerun()
-        else:
-            st.write("No players drafted yet")
+            st.write("**Currently Drafted:**")
+            for i, player in enumerate(st.session_state.drafted_players):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"{i+1}. {player}")
+                with col2:
+                    if st.button("❌", key=f"remove_{i}"):
+                        st.session_state.drafted_players.remove(player)
+                        st.rerun()
         
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Export options
-        st.subheader("📤 Export Data")
-        export_format = st.selectbox("Export Format", ["CSV", "JSON"])
-        
-        if not st.session_state.filtered_data.empty:
-            if st.button("📥 Download Data"):
-                data_bytes, mime_type, filename = export_data(st.session_state.filtered_data, export_format)
-                st.download_button(
-                    label=f"Download {export_format}",
-                    data=data_bytes,
-                    file_name=filename,
-                    mime=mime_type
-                )
+        # Clear all drafted
+        if st.button("🗑️ Clear All Drafted"):
+            st.session_state.drafted_players = []
+            st.rerun()
     
     # Main content area
-    if st.session_state.players_data.empty:
-        st.info("👆 Click 'Refresh Player Data' in the sidebar to load player statistics.")
+    if st.session_state.df is not None:
+        df = st.session_state.df.copy()
         
-        # Show ESPN scoring explanation
-        st.subheader("📋 ESPN Points Scoring System")
+        # Filters
+        st.header("🔍 Filters & Sorting")
+        
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown("""
-            **Positive Categories:**
-            - Points: × 1.0
-            - Rebounds: × 1.2
-            - Assists: × 1.5
-            """)
+            # Position filter
+            positions = ["All"] + sorted(df['Pos'].unique().tolist())
+            position_filter = st.selectbox("Filter by Position:", positions)
         
         with col2:
-            st.markdown("""
-            **Defensive Categories:**
-            - Steals: × 3.0
-            - Blocks: × 3.0
-            """)
+            # Name filter
+            name_filter = st.text_input("Filter by Player Name:", placeholder="Search players...")
         
         with col3:
-            st.markdown("""
-            **Negative Category:**
-            - Turnovers: × -1.0
-            """)
+            # Sort options
+            sort_by = st.selectbox("Sort by:", ["FPPG", "Total"])
+            sort_ascending = st.checkbox("Ascending", value=False)
         
-        st.markdown("**FPPG = (PTS × 1) + (REB × 1.2) + (AST × 1.5) + (STL × 3) + (BLK × 3) + (TO × -1)**")
+        # Apply filters
+        filtered_df = filter_players(df, st.session_state.drafted_players, position_filter, name_filter)
         
-    else:
-        # Filter data
-        st.session_state.filtered_data = filter_players(
-            st.session_state.players_data, 
-            position_filter, 
-            name_search
-        )
-        
-        # Summary metrics
-        st.subheader("📈 Summary Statistics")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total Players", len(st.session_state.filtered_data))
-        
-        with col2:
-            if not st.session_state.filtered_data.empty:
-                avg_fppg = st.session_state.filtered_data['FPPG'].mean()
-                st.metric("Avg FPPG", f"{avg_fppg:.1f}")
-            else:
-                st.metric("Avg FPPG", "N/A")
-        
-        with col3:
-            if not st.session_state.filtered_data.empty:
-                top_player = st.session_state.filtered_data.iloc[0]['Player']
-                top_fppg = st.session_state.filtered_data.iloc[0]['FPPG']
-                st.metric("Top Player", f"{top_player} ({top_fppg:.1f})")
-            else:
-                st.metric("Top Player", "N/A")
-        
-        with col4:
-            st.metric("Drafted", len(st.session_state.drafted_players))
-        
-        # Player rankings table
-        st.subheader("🏆 Player Rankings")
-        
-        if not st.session_state.filtered_data.empty:
-            # Display columns selection
-            display_cols = st.multiselect(
-                "Select columns to display:",
-                options=['Player', 'Team', 'Position', 'GP', 'PTS_PG', 'REB_PG', 
-                        'AST_PG', 'STL_PG', 'BLK_PG', 'TO_PG', 'FPPG', 'Total'],
-                default=['Player', 'Team', 'Position', 'GP', 'PTS_PG', 'REB_PG', 
-                        'AST_PG', 'STL_PG', 'BLK_PG', 'TO_PG', 'FPPG']
-            )
-            
-            if display_cols:
-                display_data = st.session_state.filtered_data[display_cols].copy()
-                
-                # Add draft buttons
-                if 'Player' in display_cols:
-                    player_col_idx = display_cols.index('Player')
-                    
-                    # Create a custom dataframe with draft buttons
-                    for idx, row in display_data.iterrows():
-                        player_name = row['Player']
-                        if player_name not in st.session_state.drafted_players:
-                            col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 1])
-                            
-                            with col1:
-                                st.write(f"**{player_name}**")
-                            
-                            with col2:
-                                st.write(f"**{row['Team']}**")
-                            
-                            with col3:
-                                st.write(f"**{row['Position']}**")
-                            
-                            with col4:
-                                st.write(f"**{row['FPPG']:.1f}**")
-                            
-                            with col5:
-                                if st.button("Draft", key=f"draft_{player_name}"):
-                                    st.session_state.drafted_players.add(player_name)
-                                    st.rerun()
-                            
-                            # Show other stats in a compact format
-                            if len(display_cols) > 4:
-                                stats_text = " | ".join([f"{col}: {row[col]:.1f}" for col in display_cols[4:] if col != 'Player'])
-                                st.caption(stats_text)
-                            
-                            st.divider()
-                
-                # Alternative: Show as dataframe with draft functionality
-                st.subheader("📊 Full Rankings Table")
-                
-                # Add a column for draft status
-                display_data_with_draft = display_data.copy()
-                display_data_with_draft['Draft Status'] = display_data_with_draft['Player'].apply(
-                    lambda x: "✅ Drafted" if x in st.session_state.drafted_players else "⭕ Available"
-                )
-                
-                # Filter out drafted players from the table if desired
-                show_drafted = st.checkbox("Show drafted players in table", value=False)
-                if not show_drafted:
-                    display_data_with_draft = display_data_with_draft[
-                        ~display_data_with_draft['Player'].isin(st.session_state.drafted_players)
-                    ]
-                
-                st.dataframe(
-                    display_data_with_draft,
-                    use_container_width=True,
-                    hide_index=True
-                )
-                
-                # Quick draft buttons for top players
-                st.subheader("⚡ Quick Draft (Top 10 Available)")
-                top_available = display_data_with_draft.head(10)
-                
-                cols = st.columns(5)
-                for i, (_, player) in enumerate(top_available.iterrows()):
-                    if i < 10 and player['Player'] not in st.session_state.drafted_players:
-                        with cols[i % 5]:
-                            if st.button(f"Draft {player['Player']}", key=f"quick_draft_{player['Player']}"):
-                                st.session_state.drafted_players.add(player['Player'])
-                                st.rerun()
-        
+        # Sort data
+        if sort_by == "FPPG":
+            filtered_df = filtered_df.sort_values('FPPG', ascending=sort_ascending)
         else:
-            st.warning("No players match your current filters.")
+            # For Total, handle NaN values by putting them at the end
+            filtered_df = filtered_df.sort_values('Total', ascending=sort_ascending, na_position='last')
         
-        # Position distribution chart
-        if not st.session_state.filtered_data.empty and len(st.session_state.filtered_data) > 1:
-            st.subheader("📊 Position Distribution")
+        # Display rankings
+        st.header("📈 Player Rankings")
+        
+        # Show summary stats
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Available Players", len(filtered_df))
+        with col2:
+            st.metric("Drafted Players", len(st.session_state.drafted_players))
+        with col3:
+            if len(filtered_df) > 0:
+                st.metric("Top FPPG", f"{filtered_df.iloc[0]['FPPG']:.1f}")
+        with col4:
+            if len(filtered_df) > 0 and pd.notna(filtered_df.iloc[0]['Total']):
+                st.metric("Top Total", f"{filtered_df.iloc[0]['Total']:.1f}")
+        
+        # Display table
+        if len(filtered_df) > 0:
+            # Select columns to display
+            display_columns = ['Player', 'Pos', 'FPPG', 'Total']
             
-            position_counts = st.session_state.filtered_data['Position'].value_counts()
+            # Add stat columns if they exist
+            stat_columns = ['PTS', 'REB', 'AST', 'STL', 'BLK', 'TO']
+            for col in stat_columns:
+                if col in filtered_df.columns:
+                    display_columns.append(col)
             
-            fig = px.pie(
-                values=position_counts.values,
-                names=position_counts.index,
-                title="Available Players by Position"
+            # Add GP if it exists
+            if 'GP' in filtered_df.columns:
+                display_columns.append('GP')
+            
+            # Create display dataframe
+            display_df = filtered_df[display_columns].copy()
+            
+            # Format numbers
+            if 'FPPG' in display_df.columns:
+                display_df['FPPG'] = display_df['FPPG'].round(1)
+            if 'Total' in display_df.columns:
+                display_df['Total'] = display_df['Total'].round(1)
+            
+            # Add ranking
+            display_df.insert(0, 'Rank', range(1, len(display_df) + 1))
+            
+            # Display table
+            st.dataframe(
+                display_df,
+                use_container_width=True,
+                hide_index=True
             )
-            st.plotly_chart(fig, use_container_width=True)
             
-            # FPPG distribution by position
-            st.subheader("📈 FPPG Distribution by Position")
-            
-            fig_box = px.box(
-                st.session_state.filtered_data,
-                x='Position',
-                y='FPPG',
-                title="Fantasy Points Per Game by Position"
+            # Export button
+            csv = display_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Rankings as CSV",
+                data=csv,
+                file_name=f"fantasy_rankings_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
             )
-            st.plotly_chart(fig_box, use_container_width=True)
+        else:
+            st.warning("No players match the current filters.")
+    
+    else:
+        st.info("👆 Please upload a CSV file with player projections to get started.")
+        
+        # Show expected format
+        st.subheader("Expected CSV Format:")
+        st.code("""
+Player,Pos,PTS,REB,AST,STL,BLK,TO,GP
+LeBron James,SF,25.0,7.5,7.0,1.2,0.8,3.5,70
+Stephen Curry,PG,30.0,5.0,6.0,1.5,0.3,3.0,75
+...
+        """, language="csv")
 
 if __name__ == "__main__":
     main()
